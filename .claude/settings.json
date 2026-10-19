@@ -1,0 +1,21 @@
+{
+  "extraKnownMarketplaces": {
+    "qa-automation-toolkit": {
+      "source": {
+        "source": "github",
+        "repo": "FruNoman/qa-automation-toolkit"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "qa-core@qa-automation-toolkit": true,
+    "qa-java@qa-automation-toolkit": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew gatlingRun:*)",
+      "Bash(./gradlew compileGatlingJava:*)",
+      "Bash(./gradlew checkstyleGatling:*)"
+    ]
+  }
+}

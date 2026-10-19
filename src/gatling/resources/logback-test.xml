@@ -1,0 +1,10 @@
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder><pattern>%d{HH:mm:ss.SSS} %-5level %logger{30} - %msg%n</pattern></encoder>
+  </appender>
+  <!-- a failed request's details: DEBUG on io.gatling.http.engine.response for a debug run -->
+  <logger name="io.gatling.http.engine.response" level="INFO"/>
+  <!-- the run's own setup (mock, token, feeds, the plan) -->
+  <logger name="com.frunoyman.perf" level="INFO"/>
+  <root level="WARN"><appender-ref ref="CONSOLE"/></root>
+</configuration>

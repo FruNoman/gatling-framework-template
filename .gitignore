@@ -1,0 +1,8 @@
+.gradle/
+build/
+.idea/
+*.iml
+# local secrets for this machine — only the variable names go into the repo (.env.example)
+.env/
+# agent scratch — regenerable, never reviewed
+.claude/scratch/
