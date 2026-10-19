@@ -63,6 +63,9 @@ src/gatling/resources/  application.conf (a block per environment), logback-test
 
 - An open rate is **sessions per second**; requests per second ≈ rate × `requestsPerSession()` (4 + `callsPerSession`). The plan
   logged at the start gives each level / phase with its wall-clock time — read the report and the APM against it.
+- **The mix**: `-Dtools=search:8,company_details:1` — each call picks a tool by its weight (`randomSwitch` with shares that add
+  up to exactly 100 %; a gap would be a call never made). Weights come from the real traffic (logs, APM); an expensive tool is
+  never in the default.
 - Assert **per request**: a tool call (hundreds of ms) and a protocol request (tens of ms) in one global p95 hide each other.
   `initialize` has its own threshold (session creation, cold TLS). Never assert a teardown request (`close session`): `maxDuration`
   may cut it, and an assertion on a request that never ran fails the run ("Could not find stats matching assertion path").

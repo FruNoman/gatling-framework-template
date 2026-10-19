@@ -32,7 +32,7 @@ G="com.frunoyman.perf.simulations.McpSimulation"
 ./gradlew gatlingRun --simulation $G -Dprofile=stress -Drate=1 -Dstep=1 -Dsteps=4 -DsteadyState=40
 ./gradlew gatlingRun --simulation $G -Dprofile=spike  -Drate=1 -DspikeFactor=4 -Dspike=15 -DsteadyState=20
 ./gradlew gatlingRun --simulation $G -Dprofile=soak   -Drate=1 -DsteadyState=3600
-#  -Denv=local|dev   -Dtools=search,company_details   -DcallsPerSession=5 -DpauseMs=1000
+#  -Denv=local|dev   -Dtools=search:8,company_details:1 (weights — the real traffic's mix)   -DcallsPerSession=5 -DpauseMs=1000
 #  thresholds: -DmaxFailedPercent=1 -DmaxToolCallP95Ms=3000 -DmaxInitializeP95Ms=1500 -DmaxProtocolP95Ms=500
 #  stop at a breaking point: -DabortFailedPercent=30
 ```

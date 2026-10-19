@@ -56,7 +56,7 @@ public class McpSimulation extends Simulation {
         mockServer.start();
         tokenStore.start();
         companyFeeder.load();
-        log.info("{} on {}, tools {} — plan:", loadProfile.profile(), service.baseUrl(), loadProfile.tools());
+        log.info("{} on {}, tool weights {} — plan:", loadProfile.profile(), service.baseUrl(), loadProfile.toolWeights());
         Injections.plan(loadProfile).forEach(line -> log.info("  {}", line));
     }
 
