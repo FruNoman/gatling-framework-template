@@ -1,0 +1,33 @@
+// The example gRPC service of this template (grpcdemo/): a unary search and a unary read — what a real service's published .proto
+// (or its client artifact, `protobuf("group:artifact:version")`) gives in a project. ONBOARD: replace with the service's own.
+syntax = "proto3";
+
+package grpcdemo;
+
+option java_package = "com.frunoyman.perf.grpcdemo.proto";
+option java_multiple_files = true;
+
+service CompanySearch {
+  // Companies whose name contains the query, at most `limit`.
+  rpc Find (FindRequest) returns (FindResponse);
+  // One company by id; NOT_FOUND for an unknown id.
+  rpc GetCompany (GetCompanyRequest) returns (Company);
+}
+
+message FindRequest {
+  string name = 1;
+  int32 limit = 2;
+}
+
+message FindResponse {
+  repeated Company companies = 1;
+}
+
+message GetCompanyRequest {
+  string id = 1;
+}
+
+message Company {
+  string id = 1;
+  string name = 2;
+}
