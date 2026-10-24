@@ -41,6 +41,11 @@ public final class RunStats {
     private static volatile Instant endedAt;
     private static volatile Verdict verdict = Verdict.NONE;
     private static volatile boolean counting = true;
+    /** The OK / KO of the last {@link #RECENT_SIZE} counted answers, oldest overwritten — what the request-based failure guard reads. */
+    private static final int RECENT_SIZE = 1000;
+    private static final boolean[] RECENT_KO = new boolean[RECENT_SIZE];
+    private static int recentNext;
+    private static int recentCount;
 
     private RunStats() {
     }
@@ -129,6 +134,23 @@ public final class RunStats {
         request(requestName).answered(ok, millis, counting);
         if (counting) {
             LiveMetrics.response(requestName, ok, millis);
+            synchronized (RECENT_KO) {
+                RECENT_KO[recentNext] = !ok;
+                recentNext = (recentNext + 1) % RECENT_SIZE;
+                recentCount = Math.min(RECENT_SIZE, recentCount + 1);
+            }
+        }
+    }
+
+    /** The failed share of the last {@code window} counted answers (at most 1000), and how many there were — for the failure guard. */
+    public static double[] recentFailed(int window) {
+        synchronized (RECENT_KO) {
+            int n = Math.min(window, recentCount);
+            int failed = 0;
+            for (int i = 1; i <= n; i++) {
+                failed += RECENT_KO[(recentNext - i + RECENT_SIZE) % RECENT_SIZE] ? 1 : 0;
+            }
+            return new double[] {n == 0 ? 0 : 100.0 * failed / n, n};
         }
     }
 

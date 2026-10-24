@@ -69,7 +69,9 @@ A new service = a package next to `mcp/` with the same sub-packages; `core/` doe
   calls) 3 s — `Limits.of(profile, perRequest, everyRequest)`. Never assert `close session` (`maxDuration` may cut it).
 - **The mix**: `McpScenarios.WEIGHTS` (search 100, getCompany 0 — the stand-in for a tool that costs something), a run overrides
   with `-Dweights=search:80,getCompany:20`; the shares add up to 100.
-- **FailureGuard**: the failed share of the last 100 sessions above `-DabortFailedPercent` (30) stops the load. Prove it on the
+- **FailureGuard**: the failed share of the last 100 sessions above `-DabortFailedPercent` (30) stops the load; `-DabortOn=requests`
+  counts the last 500 requests instead — a session with any failed request is a failed session, so rare refusals in long sessions
+  trip the session basis long before the request share matters. Prove it on the
   mock: `-Dlocal.mock-server.failure-percent=50`.
 - The run's own numbers (`RunStats`) match Gatling's report request by request (checked on the mock 2026-10-22: smoke 170 = 170,
   load with 20 % tool errors 325 / 31 KO = 325 / 31 KO); the summary table is logged after the run, empty answers too.
