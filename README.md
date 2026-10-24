@@ -35,7 +35,7 @@ runs; after it, a summary table per request and the empty answers. Report:
 ./gradlew gatlingRun -Dsimulation=McpSimulation -Dprofile=soak   -Drate=1 -DsteadyState=3600
 #  -Denv=local|dev   -Dweights=search:80,getCompany:20 (the real traffic's mix)   -DcallsPerSession=5 -DpauseMs=1000
 #  thresholds: -DmaxFailedPercent=1 -DmaxCallP95Ms=3000 -DmaxInitializeP95Ms=1500 -DmaxProtocolP95Ms=500
-#  stop at a breaking point: -DabortFailedPercent=30
+#  stop at a breaking point: -DabortFailedPercent=30 (of the last 100 sessions; -DabortOn=requests: of the last 500 requests)
 ```
 
 An open rate is **sessions per second**; one session = initialize, initialized, tools/list, `callsPerSession` tool calls, close —
