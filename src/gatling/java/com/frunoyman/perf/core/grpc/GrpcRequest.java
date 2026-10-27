@@ -28,8 +28,13 @@ public final class GrpcRequest {
         return GrpcServerStreamActionBuilder.of(channel, name, method);
     }
 
-    /** A bidirectional- or client-streaming RPC, sent under flow control ({@link GrpcBidiStreamActionBuilder}). */
+    /** A bidirectional-streaming RPC, sent under flow control ({@link GrpcBidiStreamActionBuilder}) — N out, N back. */
     public <Q, R> GrpcBidiStreamActionBuilder<Q, R> bidiStream(MethodDescriptor<Q, R> method) {
-        return GrpcBidiStreamActionBuilder.of(channel, name, method);
+        return GrpcBidiStreamActionBuilder.of(channel, name, method, MethodDescriptor.MethodType.BIDI_STREAMING);
+    }
+
+    /** A client-streaming RPC, the same builder ({@link GrpcBidiStreamActionBuilder}) — N out, one answer back. */
+    public <Q, R> GrpcBidiStreamActionBuilder<Q, R> clientStream(MethodDescriptor<Q, R> method) {
+        return GrpcBidiStreamActionBuilder.of(channel, name, method, MethodDescriptor.MethodType.CLIENT_STREAMING);
     }
 }

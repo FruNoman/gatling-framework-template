@@ -119,7 +119,8 @@ return exec(
   the gRPC status code + description, or the check's text with both values.
 - The deadline (`deadline-ms`) is set per call by `GrpcChannel.callOptions()` — never a `CallOptions` field: a deadline is absolute,
   shared options expire for the whole run at once. A per-user token: `.callOptions(o -> o.withCallCredentials(…))`.
-- A stream is one action, timed as a whole; a bidi / client stream sends under flow control. Never a blocking call (it holds
+- A stream is one action, timed as a whole: `.serverStream`, `.bidiStream`, `.clientStream` (check its one answer with
+  `last(response(…).is(…))`); bidi and client streams send under flow control. Never a blocking call (it holds
   Gatling's engine thread: half the planned load applied, a healthy p95).
 - One `GrpcChannel` per target: `start()` in `before()`, `stop()` in `after()` after `RunStats.stop()`; no protocol in `setUp`.
 - It uses Gatling's internal Scala API (`Action`, `StatsEngine.logResponse`) — after a Gatling upgrade, compile and run the gRPC
