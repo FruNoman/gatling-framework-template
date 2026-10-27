@@ -35,8 +35,8 @@ public class GrpcSimulation extends Simulation {
     private final LoadProfile loadProfile = LoadProfile.fromSystemProperties(new LoadProfile.Defaults(2, 5, Duration.ofMillis(200), 1000, 0));
     private final Weights weights = Weights.of(CompanySearchScenarios.WEIGHTS);
     private final MockCompanySearchServer mockServer = new MockCompanySearchServer(settings.mock());
-    private final GrpcChannel channel = new GrpcChannel(settings.target(), settings.plaintext());
-    private final CompanySearchScenarios scenarios = new CompanySearchScenarios(new CompanySearchActions(channel, settings.deadlineMs()));
+    private final GrpcChannel channel = new GrpcChannel(settings.target(), settings.plaintext(), settings.deadlineMs());
+    private final CompanySearchScenarios scenarios = new CompanySearchScenarios(new CompanySearchActions(channel));
     private final Limits limits = Limits.of(loadProfile, Map.of(), EVERY_RPC_P95_MS);
 
     {

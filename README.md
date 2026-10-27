@@ -57,14 +57,26 @@ See it fail: `-Dlocal.mock-server.failure-percent=50` on `stress` — the Failur
 | `mcp/simulations/` | `McpSimulation` — the setUp on one screen |
 | `mcp/auth/`, `mcp/config/`, `mcp/protocol/` | the token store, the settings records, the MCP protocol + checks + headers |
 | `mcp/mock/` | the example service on the JDK `HttpServer` — tokens that expire, sessions, an SSE answer, tool errors, a data endpoint |
-| `core/grpc/`, `grpcdemo/`, `src/gatling/proto/` | gRPC without Gatling Enterprise: a unary call over the async stub as a Gatling action, an example service with its mock (below) |
+| `core/grpc/`, `grpcdemo/`, `src/gatling/proto/` | gRPC without Gatling Enterprise: unary and streaming calls as Gatling actions over protoc's method descriptors, in Gatling's own DSL shape; an example service with its mock (below) |
 
 A new service = a package next to `mcp/` with the same sub-packages.
 
 **gRPC**: `./gradlew gatlingRun -Dsimulation=GrpcSimulation -Dprofile=smoke` — a mock gRPC server on port 8090 (latency
-`-Dlocal.grpc-demo.mock.latency-ms=50`, errors `-Dlocal.grpc-demo.mock.failure-percent=20`); the actions are
-`exec(grpc("Service/Method", this::stub, Stub::method).request(…).check(…))` over the generated **async** stub — Gatling's own gRPC
-plugin is Gatling Enterprise, a blocking stub stalls the load generator. Details in `framework-core`.
+`-Dlocal.grpc-demo.mock.latency-ms=50`, errors `-Dlocal.grpc-demo.mock.failure-percent=20`). An action reads like Gatling
+Enterprise's gRPC DSL, on the free Gatling:
+
+```java
+exec(
+        grpc("CompanySearch/GetCompany")
+            .unary(CompanySearchGrpc.getGetCompanyMethod())
+            .send(session -> GetCompanyRequest.newBuilder().setId(session.getString("companyId")).build())
+            .check(response(Company::getId).isEL("#{companyId}"))
+);
+```
+
+`.serverStream(…)` / `.bidiStream(…)` take a stream, timed as one request; the call is the **async** `ClientCalls` one — a blocking
+call stalls the load generator. How it works, step by step, with the runs that prove it:
+[gatling-grpc-connector-demo](https://github.com/FruNoman/gatling-grpc-connector-demo). Details in `framework-core`.
 
 **Live metrics**: `graphite.host` in `application.conf` (or `GRAPHITE_HOST`) — `LiveMetrics` sends what Gatling's removed Graphite
 writer sent, every second, to a Graphite listener in front of a dashboard; unset → off.

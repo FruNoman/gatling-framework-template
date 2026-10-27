@@ -2,10 +2,11 @@ package com.frunoyman.perf.core.grpc;
 
 import io.gatling.javaapi.core.ActionBuilder;
 import io.gatling.javaapi.core.Session;
-import io.grpc.stub.StreamObserver;
+import io.grpc.CallOptions;
+import io.grpc.MethodDescriptor;
 
 import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 /**
  * A unary gRPC call as a Gatling action — Gatling's own gRPC support is Gatling Enterprise; this is the free way, on the same
@@ -13,59 +14,76 @@ import java.util.function.Supplier;
  *
  * <pre>{@code
  * exec(
- *         grpc("CompanySearch/Find", this::stub, CompanySearchStub::find)
- *             .request(session -> FindRequest.newBuilder().setName(session.getString("companyName")).build())
- *             .check(response -> response.getCompaniesCount() > 0 ? null : "no company found")
+ *         grpc("CompanySearch/GetCompany")
+ *             .unary(CompanySearchGrpc.getGetCompanyMethod())
+ *             .send(session -> GetCompanyRequest.newBuilder().setId(session.getString("companyId")).build())
+ *             .check(response(Company::getId).isEL("#{companyId}"))
  * )
  * }</pre>
  *
- * The stub is the generated <b>async</b> one ({@code newStub}, never {@code newBlockingStub}: a blocking call holds one of Gatling's
- * few engine threads and the run applies a fraction of the planned load with a healthy p95). {@code stub} is called per request,
- * so a deadline set in it ({@code withDeadlineAfter}) is fresh each time. {@link #check}: null = OK, else the KO's reason.
+ * The RPC is named by protoc's generated descriptor getter and nothing else ({@link GrpcDsl}): no stub, no method reference, and
+ * the request and response types inferred from it. The call goes out through {@code ClientCalls.asyncUnaryCall} — the
+ * <b>async</b> path, the one the generated {@code newStub} takes, never {@code newBlockingStub}: a blocking call holds one of
+ * Gatling's few engine threads and the run applies a fraction of the planned load with a healthy p95
+ * (measured in new-perf-simulation's references/grpc.md). {@link #check}: null = OK, else the KO's reason.
  */
-public final class GrpcActionBuilder<S, Q, R> implements ActionBuilder {
+public final class GrpcActionBuilder<Q, R> implements ActionBuilder {
 
-    /** An async stub's unary method: {@code CompanySearchStub::find}. */
-    @FunctionalInterface
-    public interface Call<S, Q, R> {
-        void invoke(S stub, Q request, StreamObserver<R> responses);
-    }
-
+    private final GrpcChannel channel;
     private final String name;
-    private final Supplier<S> stub;
-    private final Call<S, Q, R> call;
+    private final MethodDescriptor<Q, R> method;
     private Function<Session, Q> request;
-    private Function<R, String> check = response -> null;
+    private GrpcCheck<R> check = (response, session) -> null;
+    private UnaryOperator<CallOptions> callOptions = UnaryOperator.identity();
 
-    private GrpcActionBuilder(String name, Supplier<S> stub, Call<S, Q, R> call) {
+    private GrpcActionBuilder(GrpcChannel channel, String name, MethodDescriptor<Q, R> method) {
+        this.channel = channel;
         this.name = name;
-        this.stub = stub;
-        this.call = call;
+        this.method = method;
     }
 
-    /** {@code name} — the request's name in the report and the assertions, the RPC's own ("CompanySearch/Find"). */
-    public static <S, Q, R> GrpcActionBuilder<S, Q, R> grpc(String name, Supplier<S> stub, Call<S, Q, R> call) {
-        return new GrpcActionBuilder<>(name, stub, call);
+    /** {@code name} — the request's name in the report and the assertions, the RPC's own ("CompanySearch/GetCompany"). */
+    static <Q, R> GrpcActionBuilder<Q, R> of(GrpcChannel channel, String name, MethodDescriptor<Q, R> method) {
+        return new GrpcActionBuilder<>(channel, name, method);
     }
 
     /** The request message, built from the session. */
-    public GrpcActionBuilder<S, Q, R> request(Function<Session, Q> requestFromSession) {
+    public GrpcActionBuilder<Q, R> send(Function<Session, Q> requestFromSession) {
         this.request = requestFromSession;
         return this;
     }
 
-    /** The answer's check: null when it is right, else the reason — the KO's message in the report. */
-    public GrpcActionBuilder<S, Q, R> check(Function<R, String> reasonOrNull) {
-        this.check = reasonOrNull;
+    /** The answer's check ({@link GrpcCheck}) — several are run in order and the first reason is the KO's. */
+    @SafeVarargs
+    public final GrpcActionBuilder<Q, R> check(GrpcCheck<R>... checks) {
+        this.check = GrpcCheck.all(checks);
+        return this;
+    }
+
+    /**
+     * The one escape hatch the generated stub used to be: the {@link CallOptions} of every call of this action, on top of the
+     * channel's deadline, applied <b>per call</b> inside the action.
+     * <p>
+     * This is where a token goes against a real service —
+     * {@code .callOptions(options -> options.withCallCredentials(new BearerToken(tokens)))}, a {@code CallCredentials} that reads
+     * the run's token store, as the HTTP protocol's header does. Nothing here may capture a deadline or anything else that is
+     * absolute: the operator is called once per call, on whatever the channel just built ({@link GrpcChannel#callOptions}).
+     * <p>
+     * Static metadata (an API key, a tenant header) is smaller as a {@code ClientInterceptor} on the channel instead — one place
+     * for the whole run, no per-action wiring.
+     */
+    public GrpcActionBuilder<Q, R> callOptions(UnaryOperator<CallOptions> perCall) {
+        this.callOptions = perCall;
         return this;
     }
 
     @Override
     public io.gatling.core.action.builder.ActionBuilder asScala() {
         if (request == null) {
-            throw new IllegalStateException(name + ": no request(...)");
+            throw new IllegalStateException(name + ": no send(...)");
         }
-        return (context, next) -> new GrpcCallAction<>(name, stub, call, request, check, context.coreComponents().statsEngine(),
-                context.coreComponents().clock(), next);
+        GrpcShape.require(name, method, MethodDescriptor.MethodType.UNARY);
+        return (context, next) -> new GrpcUnaryAction<>(name, channel, method, callOptions, request, check,
+                context.coreComponents().statsEngine(), context.coreComponents().clock(), next);
     }
 }
