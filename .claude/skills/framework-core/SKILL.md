@@ -23,7 +23,7 @@ src/gatling/java/com/frunoyman/perf/
     metrics/            LiveMetrics — Graphite lines for a dashboard, off without graphite.host
     simulation/         Sessions (closed / open + FailureGuard), Injections (the profile + the plan), Limits (assertions + verdict),
                         FailureGuard
-    grpc/               GrpcActionBuilder + GrpcCallAction (a unary call over the async stub as a Gatling action), GrpcChannel
+    grpc/               GrpcDsl → grpc(name).unary / serverStream / bidiStream(descriptor), the actions, GrpcCall, GrpcChannel
     protocols/          Protocols.restProtocol — JSON, User-Agent, the run's counting
     utils/              Json — the one Jackson mapper
   mcp/                  the example service (ONBOARD: a package per service under load)
@@ -96,28 +96,38 @@ users) to `graphite.host`:2003. Unset → off. To fill an existing dashboard, po
 
 ## gRPC — without Gatling Enterprise
 
-Gatling's gRPC plugin is Gatling Enterprise; here a unary call is a small custom action over the generated **async** stub
-(`core/grpc/`), recorded in Gatling's report under the RPC's name and in the run's own counting (`RunStats.sent / answered`, the
-live metrics), the session going on on its own event loop. An action:
+Gatling's gRPC plugin is Gatling Enterprise; here a gRPC call is a custom action over protoc's generated **method descriptor** and
+the **async** `ClientCalls` (`core/grpc/`), written in Gatling's own DSL shape, recorded in Gatling's report under the RPC's name and
+in the run's own counting (`RunStats.sent / answered`, the live metrics), the session going on on its own event loop. An actions
+class extends `GrpcDsl` (it holds the channel):
 
 ```java
 return exec(
-        grpc("CompanySearch/Find", this::stub, CompanySearchStub::find)
-            .request(session -> FindRequest.newBuilder()
+        grpc("CompanySearch/Find")
+            .unary(CompanySearchGrpc.getFindMethod())
+            .send(session -> FindRequest.newBuilder()
                     .setName(session.getString("companyName"))
                     .build())
-            .check(response -> response.getCompaniesCount() > 0 ? null : "no company found")
+            .check(response(FindResponse::getCompaniesCount).gt(0))
 );
 ```
 
-- `this::stub` → `CompanySearchGrpc.newStub(channel.get()).withDeadlineAfter(…)` — a fresh stub per call, so the deadline is
-  per call; never the blocking stub (it holds Gatling's engine thread: half the planned load applied, a healthy p95).
+- No stub: `getXxxMethod()` carries the marshallers, the name and the shape. `.unary` / `.serverStream` / `.bidiStream` must match
+  the descriptor's `MethodType` — checked when the scenario is built, before the first user (`GrpcShape`).
+- Checks: `response(getter).is(v)` / `.is(session -> v)` / `.isEL("#{…}")` / `.gt(v)`, `messageCount().is(n)` for a stream;
+  `.check(a, b)` runs them in order. A lambda `(response, session) -> reasonOrNull` for anything else. A KO names its reason:
+  the gRPC status code + description, or the check's text with both values.
+- The deadline (`deadline-ms`) is set per call by `GrpcChannel.callOptions()` — never a `CallOptions` field: a deadline is absolute,
+  shared options expire for the whole run at once. A per-user token: `.callOptions(o -> o.withCallCredentials(…))`.
+- A stream is one action, timed as a whole; a bidi / client stream sends under flow control. Never a blocking call (it holds
+  Gatling's engine thread: half the planned load applied, a healthy p95).
 - One `GrpcChannel` per target: `start()` in `before()`, `stop()` in `after()` after `RunStats.stop()`; no protocol in `setUp`.
-- A KO names its reason: the gRPC status code + description, or the check's text.
 - It uses Gatling's internal Scala API (`Action`, `StatsEngine.logResponse`) — after a Gatling upgrade, compile and run the gRPC
-  smoke. Proven on the mock (2026-10-22, Gatling 3.16.0, grpc-java 1.68.0): our counts = the report per RPC (225 / 43 KO with 20 %
-  mock errors); 200 calls/s planned with 200 ms latency → 4 100 calls in 22 s, p95 205 ms.
-- Stubs: the protobuf Gradle plugin generates them from `src/gatling/proto` into the `gatling` source set (checkstyle skips them).
+  smoke. Proven on the mock (2026-10-27, Gatling 3.16.0, grpc-java 1.68.0): smoke 942 / 0 KO; with 20 % mock errors and a check
+  made wrong on purpose our counts = the report (201 / 117 KO: `UNAVAILABLE: mock failure`, `response is '1', expected > '100'`).
+  Streams proven in [gatling-grpc-connector-demo](https://github.com/FruNoman/gatling-grpc-connector-demo) against grpcbin.
+- Descriptors: the protobuf Gradle plugin generates them from `src/gatling/proto` into the `gatling` source set (checkstyle skips
+  them).
 
 ## Gotchas
 
